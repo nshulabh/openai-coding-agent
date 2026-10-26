@@ -1,5 +1,7 @@
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -81,6 +83,22 @@ TOOLS = [
         },
         "strict": True,
     },
+        {
+        "type": "function",
+        "name": "run_tests",
+        "description": (
+            "Run the project's pytest test suite using the current Python "
+            "interpreter. Returns the test output and exit status. "
+            "Use this to validate code and diagnose test failures."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
 
 ]
 
@@ -154,6 +172,34 @@ def write_python_file(filename, content):
     file_path.write_text(content, encoding="utf-8")
     return f"Successfully created {filename} after user approval."
 
+def run_tests():
+    """Run pytest from the project root with a fixed command and timeout."""
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "-v"],
+            cwd=PROJECT_DIR,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+            shell=False,
+        )
+
+        output = (
+            f"Exit code: {result.returncode}\n\n"
+            f"STDOUT:\n{result.stdout}\n\n"
+            f"STDERR:\n{result.stderr}"
+        )
+
+        return output[:12000]
+
+    except subprocess.TimeoutExpired:
+        return "Test execution timed out after 30 seconds."
+
+    except OSError as exc:
+        return f"Could not start the test runner: {exc}"
+
 
 def execute_tool(name, arguments):
     """Dispatch only explicitly approved tools."""
@@ -170,7 +216,9 @@ def execute_tool(name, arguments):
             arguments["filename"],
             arguments["content"],
         )
-
+    if name == "run_tests":
+        return run_tests()
+    
     return "Error: Unknown tool."
 
 
@@ -199,6 +247,11 @@ Rules:
 - Explain what the proposed code does before requesting file creation.
 - Never claim a file was created unless the tool confirms success.
 - Never attempt to overwrite existing files.
+- When asked to run or validate tests, use the run_tests tool.
+- Never claim tests passed unless the tool output confirms success.
+- If tests fail, explain the failure using the actual test output.
+- Do not claim that a code fix works until tests have been rerun.
+- Ask for user approval before writing or modifying code.
 """
 
 
