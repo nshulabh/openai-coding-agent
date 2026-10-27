@@ -83,7 +83,7 @@ TOOLS = [
         },
         "strict": True,
     },
-        {
+    {
         "type": "function",
         "name": "run_tests",
         "description": (
